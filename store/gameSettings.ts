@@ -21,6 +21,7 @@ interface GameSettings {
     time?: number
   }
   gameMode?: 'classic' | 'yakuza'
+  assassinMaxKills?: number
 }
 
 interface GameSettingsState {

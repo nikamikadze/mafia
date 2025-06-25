@@ -12,6 +12,7 @@ import ChoosingCharacters from './chooseCharacters'
 type NightDecisions = {
   mafiaVictim: number
   donCheck: number
+  rhCheck: number
   healed: number
   checked: number
   checkedWasMafia?: boolean
@@ -26,6 +27,7 @@ export default function Night() {
   const [nightDecisions, setNightDecisions] = useState<NightDecisions>({
     mafiaVictim: 0,
     donCheck: 0,
+    rhCheck: 0,
     healed: 0,
     checked: 0,
     assassinVictim: undefined,
@@ -33,20 +35,30 @@ export default function Night() {
   })
 
   const deadPlayers = gameState.deadPlayers
+  const isFirstNight =
+    gameState.night === 2 && gameState.shogun && gameState.yakuza
 
   function endOfNight() {
     const { gameMode, characters } = gameSettings
     const clanEnabled = characters.clan
     const isYakuzaMode = gameMode === 'yakuza' && clanEnabled
 
-    const { mafia, don, detective, assassin, doctor, yakuza, shogun } =
-      gameState
+    const {
+      mafia,
+      don,
+      detective,
+      assassin,
+      doctor,
+      yakuza,
+      shogun,
+      rightHand,
+    } = gameState
     const { mafiaVictim: mv, healed } = nightDecisions
 
     let mafiaIsDead =
       deadPlayers?.length && mafia.every((id) => deadPlayers.includes(id))
 
-    if (!mafiaIsDead && mv === 0) {
+    if (!mafiaIsDead && mv === 0 && !isFirstNight) {
       Alert.alert('Mafia must choose victim')
       return
     }
@@ -55,17 +67,13 @@ export default function Night() {
     const shogunIsAlive = shogun && !deadPlayers?.includes(shogun)
     const assassinIsAlive = assassin && !deadPlayers?.includes(assassin)
 
-    if (isYakuzaMode && yakuzaIsAlive && nightDecisions.yakuzaVictim === 0) {
-      Alert.alert('Yakuza must choose victim')
-      return
-    }
-
     if (
-      !isYakuzaMode &&
-      assassinIsAlive &&
-      nightDecisions.assassinVictim === 0
+      isYakuzaMode &&
+      yakuzaIsAlive &&
+      nightDecisions.yakuzaVictim === 0 &&
+      isFirstNight
     ) {
-      Alert.alert('Assassin must choose victim')
+      Alert.alert('Yakuza must choose victim')
       return
     }
 
@@ -84,9 +92,21 @@ export default function Night() {
     }
 
     if (
+      isYakuzaMode &&
+      rightHand &&
+      !deadPlayers?.includes(rightHand) &&
+      nightDecisions.rhCheck === 0 &&
+      !isFirstNight
+    ) {
+      Alert.alert('Right-Hand must check player')
+      return
+    }
+
+    if (
       doctor &&
       !deadPlayers?.includes(doctor) &&
-      nightDecisions.healed === 0
+      nightDecisions.healed === 0 &&
+      !isFirstNight
     ) {
       Alert.alert('Doctor must heal player')
       return
@@ -160,7 +180,7 @@ export default function Night() {
     saveGameState({
       ...gameState,
       day: gameState.night,
-      playerTalking: updatedAlive[gameState.night - 1],
+      playerTalking: updatedAlive[(gameState.night - 1) % updatedAlive.length],
       mafiaVictim,
       assassinVictim: !isYakuzaMode ? specialVictim : undefined,
       yakuzaVictim: isYakuzaMode ? specialVictim : undefined,
@@ -173,18 +193,30 @@ export default function Night() {
       checkedByDon: gameState.checkedByDon
         ? [...gameState.checkedByDon, nightDecisions.donCheck]
         : [nightDecisions.donCheck],
+      checkedByRH: gameState.checkedByRH
+        ? [...gameState.checkedByRH, nightDecisions.rhCheck]
+        : [nightDecisions.rhCheck],
       alivePlayers: updatedAlive,
       deadPlayers: updatedDead,
+      ...(gameSettings.gameMode === 'classic' &&
+        specialVictim !== undefined &&
+        gameSettings.numberOfPlayers && {
+          assassinRemainingKills:
+            typeof gameState.assassinRemainingKills === 'number'
+              ? gameState.assassinRemainingKills - 1
+              : (gameSettings.numberOfPlayers > 10 ? 2 : 1) - 1,
+        }),
       winner,
     })
+
+    console.log('winner ', winner)
 
     if (winner) return router.push(`/gameOver`)
     if (!mafiaVictim && !specialVictim) router.push('/day')
     else router.push('/lastWords')
   }
 
-  const isFirstNight =
-    gameState.night === 2 && gameState.shogun && gameState.yakuza
+  console.log(gameState.mafia, gameState.deadPlayers)
 
   if (!gameSettings.numberOfPlayers) return
 
@@ -205,7 +237,7 @@ export default function Night() {
         />
 
         {!isFirstNight &&
-          !gameState.mafia.every(
+          gameState.mafia.some(
             (item) => !gameState.deadPlayers?.includes(item)
           ) && (
             <CollapsibleSection title='mafia'>
@@ -283,6 +315,51 @@ export default function Night() {
           )}
 
         {!isFirstNight &&
+          gameState.rightHand !== undefined &&
+          gameSettings.characters.clan &&
+          !gameState.deadPlayers?.includes(gameState.rightHand) && (
+            <CollapsibleSection title='Right-Hand'>
+              {Array.from({ length: gameSettings.numberOfPlayers }).map(
+                (_, i) => {
+                  const playerNumber = i + 1
+                  const wasChecked =
+                    gameState.checkedByRH?.includes(playerNumber)
+                  const isYakuza = gameState.yakuza === playerNumber
+
+                  return (
+                    <Clickable
+                      key={i}
+                      max={4}
+                      mb={i > 6 ? (i - 7) * 2 : i * 2}
+                      size='sm'
+                      staticValue={playerNumber}
+                      color={
+                        gameState.rightHand === playerNumber ? 'red' : undefined
+                      }
+                      currentOption={nightDecisions.rhCheck}
+                      blockedCauseCheckedAsDetective={wasChecked && isYakuza}
+                      blockedCauseCheckedByDon={wasChecked && !isYakuza}
+                      backgroundColor={
+                        nightDecisions.rhCheck === playerNumber
+                          ? gameState.yakuza === playerNumber
+                            ? '#4efc03'
+                            : 'red'
+                          : undefined
+                      }
+                      setCurrentOption={(val: number) =>
+                        setNightDecisions((prev) => ({
+                          ...prev,
+                          rhCheck: val,
+                        }))
+                      }
+                    />
+                  )
+                }
+              )}
+            </CollapsibleSection>
+          )}
+
+        {!isFirstNight &&
           gameSettings.characters.doctor &&
           gameState.doctor !== undefined &&
           !gameState.deadPlayers?.includes(gameState.doctor) && (
@@ -338,6 +415,11 @@ export default function Night() {
                       size='sm'
                       staticValue={playerNumber}
                       currentOption={nightDecisions.checked}
+                      color={
+                        gameState.detective === playerNumber
+                          ? 'green'
+                          : undefined
+                      }
                       blockedCauseCheckedAsMafia={wasChecked && isMafia}
                       blockedCauseCheckedAsCitizen={wasChecked && !isMafia}
                       backgroundColor={
@@ -365,7 +447,9 @@ export default function Night() {
 
         {gameSettings.characters.assassin &&
           gameState.assassin !== undefined &&
-          !gameState.deadPlayers?.includes(gameState.assassin) && (
+          !gameState.deadPlayers?.includes(gameState.assassin) &&
+          gameState.assassinRemainingKills &&
+          gameState.assassinRemainingKills > 0 && (
             <CollapsibleSection title='assassin'>
               {Array.from({ length: gameSettings.numberOfPlayers }).map(
                 (_, i) => {

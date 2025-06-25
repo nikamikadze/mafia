@@ -165,11 +165,13 @@ export default function ChoosingCharacters() {
         healed: undefined,
         checked: undefined,
         assassinVictim: undefined,
+        assassinRemainingKills: gameSettings.assassinMaxKills,
       })
 
       router.push('/day')
     }
   }
+  console.log('settings,', gameSettings)
 
   if (gameSettings.numberOfPlayers)
     return (
@@ -237,32 +239,39 @@ export default function ChoosingCharacters() {
             )
           })}
         </CollapsibleSection>
-        <CollapsibleSection title='right-hand'>
-          {Array.from({ length: gameSettings.numberOfPlayers }).map((_, i) => {
-            const playerNumber = i + 1
-            return (
-              <Clickable
-                key={i}
-                max={4}
-                mb={i > 6 ? (i - 7) * 2 : i * 2}
-                size='sm'
-                staticValue={playerNumber}
-                currentOption={gameCharacters.rightHand}
-                setCurrentOption={(val: number) => {
-                  if (
-                    gameCharacters.mafia.includes(val) &&
-                    val !== gameCharacters.don
-                  ) {
-                    setGameCharacters((prev) => ({
-                      ...prev,
-                      rightHand: val,
-                    }))
-                  }
-                }}
-              />
-            )
-          })}
-        </CollapsibleSection>
+        {gameSettings.characters.clan && (
+          <>
+            <CollapsibleSection title='right-hand'>
+              {Array.from({ length: gameSettings.numberOfPlayers }).map(
+                (_, i) => {
+                  const playerNumber = i + 1
+                  return (
+                    <Clickable
+                      key={i}
+                      max={4}
+                      mb={i > 6 ? (i - 7) * 2 : i * 2}
+                      size='sm'
+                      staticValue={playerNumber}
+                      currentOption={gameCharacters.rightHand}
+                      setCurrentOption={(val: number) => {
+                        if (
+                          gameCharacters.mafia.includes(val) &&
+                          val !== gameCharacters.don
+                        ) {
+                          setGameCharacters((prev) => ({
+                            ...prev,
+                            rightHand: val,
+                          }))
+                        }
+                      }}
+                    />
+                  )
+                }
+              )}
+            </CollapsibleSection>
+          </>
+        )}
+
         {gameSettings.characters.doctor && (
           <CollapsibleSection title='doctor'>
             {Array.from({ length: gameSettings.numberOfPlayers }).map(

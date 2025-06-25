@@ -66,7 +66,7 @@ export default function Clickable({
     blockedColor = 'black'
   } else if (blockedCauseCheckedAsCitizen) {
     blockedColor = 'red'
-  } else if (blockedCauseCheckedByDon) {
+  } else if (blockedCauseCheckedAsDetective) {
     blockedColor = '#4efc03'
   }
 

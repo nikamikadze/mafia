@@ -26,7 +26,9 @@ type GameState = {
   yakuza?: number
   shogun?: number
   rightHand?: number
+  checkedByRH?: number[]
   yakuzaVictim?: number
+  assassinRemainingKills?: number
 }
 
 interface GameStateStore {

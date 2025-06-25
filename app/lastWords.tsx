@@ -4,31 +4,49 @@ import Title from '@/components/Title'
 import { useGameSettings } from '@/store/gameSettings'
 import { useGameState } from '@/store/gameState'
 import { router } from 'expo-router'
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { StyleSheet, View } from 'react-native'
 
 export default function LastWords({ deadByVotes }: { deadByVotes?: number[] }) {
   const gameState = useGameState((state) => state.gameState)
+  const saveGameState = useGameState((state) => state.setGameState)
   const gameSettings = useGameSettings((state) => state.gameSettings)
   const timerRef = useRef<TimerCircleHandle>(null)
   const [timerRunning, setTimerRunning] = useState(false)
   const [countDownIsOver, setCountDownIsOver] = useState(false)
+  const [victimIndex, setVictimIndex] = useState(0)
+
+  const { gameMode, characters } = gameSettings
+  const isYakuzaMode = gameMode === 'yakuza' && characters.clan
 
   const mafiaVictim = gameState.mafiaVictim
-  const assassinVictim = gameState.assassinVictim
+  const specialVictim = isYakuzaMode
+    ? gameState.yakuzaVictim
+    : gameState.assassinVictim
 
-  let victimList: number[] = []
-  if (mafiaVictim !== undefined) victimList.push(mafiaVictim)
-  if (assassinVictim !== undefined && assassinVictim !== mafiaVictim)
-    victimList.push(assassinVictim)
+  const victimList = useMemo(() => {
+    const list: number[] = []
 
-  if (victimList.length === 2) {
-    const firstIndex = Math.random() < 0.5 ? 0 : 1
+    if (
+      mafiaVictim !== undefined &&
+      specialVictim !== undefined &&
+      mafiaVictim !== specialVictim
+    ) {
+      console.log('randomizing')
+      if (Math.random() < 0.5) {
+        list.push(mafiaVictim, specialVictim)
+      } else {
+        list.push(specialVictim, mafiaVictim)
+      }
+    } else {
+      if (mafiaVictim !== undefined) list.push(mafiaVictim)
+      if (specialVictim !== undefined && specialVictim !== mafiaVictim)
+        list.push(specialVictim)
+    }
 
-    victimList.splice(firstIndex, 1)
-  }
+    return list
+  }, [mafiaVictim, specialVictim])
 
-  const [victimIndex, setVictimIndex] = useState(0)
   const victim = deadByVotes
     ? deadByVotes[victimIndex]
     : victimList[victimIndex]
@@ -60,19 +78,6 @@ export default function LastWords({ deadByVotes }: { deadByVotes?: number[] }) {
       Boolean
     ).length
 
-    const aliveSpecial =
-      isYakuzaMode && (yakuzaAlive || shogunAlive)
-        ? [gameState.yakuza, gameState.shogun].filter(
-            (p) => p && gameState.alivePlayers.includes(p)
-          )
-        : aliveAssassin
-        ? [aliveAssassin]
-        : []
-
-    const aliveCitizens = gameState.alivePlayers.filter(
-      (p) => !aliveMafia.includes(p) && !aliveSpecial.includes(p)
-    )
-
     let winner: 'Clan' | 'Assassin' | 'Mafia' | 'Citizens' | undefined =
       undefined
 
@@ -94,7 +99,10 @@ export default function LastWords({ deadByVotes }: { deadByVotes?: number[] }) {
       aliveAssassin
     ) {
       winner = 'Assassin'
-    } else if (aliveMafia.length >= aliveCitizens.length) {
+    } else if (
+      aliveMafia.length >=
+      gameState.alivePlayers.length - aliveMafia.length
+    ) {
       winner = 'Mafia'
     } else if (
       aliveMafia.length === 0 &&
@@ -104,8 +112,12 @@ export default function LastWords({ deadByVotes }: { deadByVotes?: number[] }) {
     ) {
       winner = 'Citizens'
     }
+    console.log('winner FROM LASTWORDS,', winner)
 
-    if (winner) return router.push(`/gameOver`)
+    if (winner) {
+      saveGameState({ ...gameState, winner })
+      router.push(`/gameOver`)
+    }
   }, [
     gameState.alivePlayers,
     gameState.assassin,
@@ -113,6 +125,8 @@ export default function LastWords({ deadByVotes }: { deadByVotes?: number[] }) {
     gameState.yakuza,
     gameState.shogun,
     gameSettings,
+    gameState,
+    saveGameState,
   ])
 
   const finishLastWords = () => {

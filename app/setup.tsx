@@ -70,7 +70,13 @@ export default function App() {
       return Alert.alert('Missing setting', 'Please set all foul settings.')
     }
 
-    saveSettings(gameSettings)
+    saveSettings({
+      ...gameSettings,
+      gameMode: settings.gameMode,
+      ...(settings.gameMode === 'classic' && {
+        assassinMaxKills: numberOfPlayers > 10 ? 2 : 1,
+      }),
+    })
 
     router.push('/night')
   }
